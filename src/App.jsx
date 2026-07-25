@@ -1,19 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
 import { solveDoubt } from './aiService'
+import Visualizer from './Visualizer'
 import './App.css'
 
 function App() {
   const [isHindi, setIsHindi] = useState(true)
   const [selectedImage, setSelectedImage] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  
+  // answer is now a structured JSON object
   const [answer, setAnswer] = useState(null)
   const [history, setHistory] = useState([])
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [currentStepIndex, setCurrentStepIndex] = useState(-1)
   
   const fileInputRef = useRef(null)
 
   useEffect(() => {
-    // Load history from local storage on mount
     const saved = localStorage.getItem('doubt_history')
     if (saved) {
       try {
@@ -25,12 +28,15 @@ function App() {
   }, [])
 
   const saveToHistory = (item) => {
-    const newHistory = [item, ...history].slice(0, 10); // keep last 10
+    const newHistory = [item, ...history].slice(0, 10);
     setHistory(newHistory)
     localStorage.setItem('doubt_history', JSON.stringify(newHistory))
   }
 
-  const toggleLanguage = () => setIsHindi(!isHindi)
+  const toggleLanguage = () => {
+    setIsHindi(!isHindi)
+    stopSpeaking()
+  }
 
   const handleImageChange = (e) => {
     const file = e.target.files[0]
@@ -61,6 +67,9 @@ function App() {
     try {
       const result = await solveDoubt(selectedImage)
       setAnswer(result)
+      // By default show all steps if not speaking
+      setCurrentStepIndex(result.steps ? result.steps.length - 1 : -1)
+      
       saveToHistory({
         id: Date.now(),
         image: selectedImage,
@@ -77,27 +86,65 @@ function App() {
   const loadFromHistory = (item) => {
     setSelectedImage(item.image)
     setAnswer(item.answer)
+    setCurrentStepIndex(item.answer.steps ? item.answer.steps.length - 1 : -1)
     stopSpeaking()
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const speak = (text) => {
-    if ('speechSynthesis' in window) {
-      if (isSpeaking) {
-        stopSpeaking();
-        return;
-      }
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = isHindi ? 'hi-IN' : 'en-IN';
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-      
-      setIsSpeaking(true);
-      window.speechSynthesis.speak(utterance);
-    } else {
+  const speak = () => {
+    if (!('speechSynthesis' in window)) {
       alert("Text-to-speech is not supported in your browser.");
+      return;
     }
+
+    if (isSpeaking) {
+      stopSpeaking();
+      // Show all steps if stopped manually
+      setCurrentStepIndex(answer.steps.length - 1);
+      return;
+    }
+    
+    window.speechSynthesis.cancel();
+    setIsSpeaking(true);
+    setCurrentStepIndex(-1); // Hide everything initially
+
+    const lang = isHindi ? 'hi-IN' : 'en-IN';
+    
+    // Create an utterance for the summary
+    const summaryText = isHindi ? answer.summaryHindi : answer.summaryEnglish;
+    const utterances = [];
+
+    if (summaryText) {
+      const u = new SpeechSynthesisUtterance(summaryText);
+      u.lang = lang;
+      u.onstart = () => setCurrentStepIndex(-1); // -1 means only summary is shown
+      utterances.push(u);
+    }
+
+    // Create utterances for each step
+    if (answer.steps && answer.steps.length > 0) {
+      answer.steps.forEach((step, index) => {
+        const text = isHindi ? step.hindiText : step.englishText;
+        if (text) {
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = lang;
+          u.onstart = () => setCurrentStepIndex(index);
+          // When the very last utterance finishes, reset state
+          if (index === answer.steps.length - 1) {
+            u.onend = () => setIsSpeaking(false);
+          }
+          utterances.push(u);
+        }
+      });
+    }
+
+    utterances.forEach(u => {
+      u.onerror = (e) => {
+        console.error("Speech error", e);
+        setIsSpeaking(false);
+      }
+      window.speechSynthesis.speak(u);
+    });
   }
 
   const stopSpeaking = () => {
@@ -107,12 +154,8 @@ function App() {
     }
   }
 
-  const formatText = (text) => {
-    if (!text) return null;
-    return text.split('\n').map((line, idx) => (
-      <p key={idx} style={{ marginBottom: '8px' }}>{line}</p>
-    ));
-  }
+  // Fallback for older history format (which was raw string)
+  const isOldHistoryFormat = answer && answer.hindi && typeof answer.hindi === 'string';
 
   return (
     <div className="app-container">
@@ -156,7 +199,9 @@ function App() {
                       <div className="history-details">
                         <p className="history-date">{item.timestamp}</p>
                         <p className="history-snippet">
-                          {isHindi ? item.answer.hindi.substring(0, 40) : item.answer.english.substring(0, 40)}...
+                          {isHindi 
+                            ? (item.answer.summaryHindi || (item.answer.hindi && item.answer.hindi.substring(0, 40))) 
+                            : (item.answer.summaryEnglish || (item.answer.english && item.answer.english.substring(0, 40)))}...
                         </p>
                       </div>
                     </div>
@@ -191,18 +236,51 @@ function App() {
 
             {answer && !isLoading && (
               <div className="answer-container">
-                <div className="answer-header">
-                  <button 
-                    className={`btn-tts ${isSpeaking ? 'speaking' : ''}`}
-                    onClick={() => speak(isHindi ? answer.hindi : answer.english)}
-                  >
-                    🔊 {isSpeaking ? (isHindi ? 'रोकें' : 'Stop') : (isHindi ? 'सुनें' : 'Read Aloud')}
-                  </button>
-                </div>
-                
-                <div className="answer-content">
-                  {isHindi ? formatText(answer.hindi) : formatText(answer.english)}
-                </div>
+                {isOldHistoryFormat ? (
+                  // Handle old history structure
+                  <div className="answer-content">
+                    <p style={{color: 'red', fontSize: '0.9rem'}}>Legacy Answer Format</p>
+                    {isHindi ? answer.hindi : answer.english}
+                  </div>
+                ) : (
+                  // Handle new JSON structure
+                  <>
+                    <div className="answer-header">
+                      <button 
+                        className={`btn-tts ${isSpeaking ? 'speaking' : ''}`}
+                        onClick={speak}
+                      >
+                        🔊 {isSpeaking ? (isHindi ? 'रोकें' : 'Stop') : (isHindi ? 'सुनें' : 'Read Aloud')}
+                      </button>
+                    </div>
+                    
+                    <div className="answer-content">
+                      <h3 className="answer-summary">
+                        {isHindi ? answer.summaryHindi : answer.summaryEnglish}
+                      </h3>
+                      
+                      {answer.steps && answer.steps.map((step, idx) => {
+                        const isVisible = idx <= currentStepIndex;
+                        const isActive = idx === currentStepIndex;
+                        
+                        if (!isVisible) return null;
+                        
+                        return (
+                          <div key={idx} className={`step-container ${isActive ? 'active-step' : ''}`}>
+                            <p className="step-text">
+                              <strong>{idx + 1}.</strong> {isHindi ? step.hindiText : step.englishText}
+                            </p>
+                            <Visualizer 
+                              visualType={step.visualType} 
+                              visualData={step.visualData} 
+                              isActive={isActive || (!isSpeaking && isVisible)} 
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
                 
                 <button className="btn-secondary" onClick={resetImage} style={{ marginTop: '20px' }}>
                   {isHindi ? 'अगला सवाल पूछें' : 'Ask another doubt'}

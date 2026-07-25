@@ -1,0 +1,40 @@
+.visualizer-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-md);
+  background: var(--background-color);
+  border-radius: var(--border-radius);
+  border: 2px solid var(--primary-color);
+}
+
+.math-visual {
+  text-align: center;
+}
+
+.math-equation {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--primary-color);
+  font-family: monospace;
+}
+
+.fraction-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.fraction-fill {
+  transition: stroke-dasharray 1s ease-in-out;
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
