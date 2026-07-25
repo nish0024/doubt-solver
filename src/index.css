@@ -1,22 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;800&family=Nunito:wght@400;600;800&display=swap');
 
 :root {
-  --primary-color: #4a90e2;
-  --secondary-color: #f39c12;
-  --background-color: #f7f9fc;
-  --text-color: #2c3e50;
-  --text-light: #7f8c8d;
-  --success-color: #2ecc71;
-  --danger-color: #e74c3c;
-  --font-family: 'Mukta', sans-serif;
+  /* Warm & Educational Palette */
+  --primary-color: #f6aa1c; /* Vibrant Marigold Orange */
+  --primary-hover: #e09919;
   
+  --secondary-color: #1a365d; /* Deep Navy Blue */
+  --secondary-hover: #122847;
+  
+  --background-color: #faf9f6; /* Warm Cream / Off-white */
+  
+  --text-color: #1a365d; /* Using Deep Navy for primary text instead of black */
+  --text-light: #4a5568;
+  
+  --success-color: #38a169;
+  --danger-color: #e53e3e;
+  
+  --surface-color: #ffffff;
+  
+  /* Typography */
+  --font-hindi: 'Mukta', sans-serif;
+  --font-english: 'Nunito', sans-serif;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 16px;
   --spacing-lg: 24px;
   --spacing-xl: 32px;
+  --spacing-xxl: 48px;
   
-  --border-radius: 12px;
-  --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  /* Radii & Shadows */
+  --border-radius-sm: 12px;
+  --border-radius-md: 20px;
+  --border-radius-pill: 50px;
+  
+  --box-shadow-soft: 0 10px 25px rgba(26, 54, 93, 0.08);
+  --box-shadow-hover: 0 15px 35px rgba(246, 170, 28, 0.2);
 }
 
 * {
@@ -26,25 +46,27 @@
 }
 
 body {
-  font-family: var(--font-family);
+  font-family: var(--font-hindi); /* Default to Hindi font */
   background-color: var(--background-color);
   color: var(--text-color);
-  line-height: 1.6;
-  font-size: 18px; /* Larger base font */
+  line-height: 1.7; /* Increased for readability */
+  font-size: 20px; /* Base font size increased */
   -webkit-font-smoothing: antialiased;
 }
 
+/* Fallback to Nunito for english text via a utility class if needed, or just let CSS handle it. 
+   Since Mukta supports english, we rely on it, but button/header styles can force Nunito. */
+
 button {
-  font-family: var(--font-family);
+  font-family: var(--font-english); 
   cursor: pointer;
   border: none;
-  border-radius: var(--border-radius);
-  font-weight: 600;
-  transition: opacity 0.2s;
+  font-weight: 800;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 button:active {
-  opacity: 0.8;
+  transform: scale(0.97);
 }
 
 .app-container {
@@ -59,4 +81,6 @@ button:active {
 h1, h2, h3 {
   font-weight: 800;
   margin-bottom: var(--spacing-sm);
+  color: var(--secondary-color);
+  font-family: var(--font-english);
 }
